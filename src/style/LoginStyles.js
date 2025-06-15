@@ -50,6 +50,7 @@ export default StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         marginTop: 10,
+        marginBottom: 20, // margem inferior para espaçamento extra
         elevation: 5,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 3 },
@@ -71,6 +72,7 @@ export default StyleSheet.create({
         textAlign: 'center',
     },
     forgotPasswordText: {
+        // Reutilizando signupText com ajustes
         color: Colors.textPrimary,
         marginTop: 10,
         textAlign: 'center',

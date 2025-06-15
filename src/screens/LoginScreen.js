@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
@@ -11,6 +11,7 @@ export default function LoginScreen({ navigation }) {
     const [senha, setSenha] = useState('');
     const [loading, setLoading] = useState(false);
     const [mensagem, setMensagem] = useState('');
+    const senhaInputRef = useRef(null);
 
     const getErrorMessage = (error) => {
         switch (error.code) {
@@ -38,7 +39,7 @@ export default function LoginScreen({ navigation }) {
 
         try {
             await signInWithEmailAndPassword(auth, email, senha);
-            navigation.replace('Home');
+            navigation.replace('HomeDrawer');
         } catch (error) {
             setMensagem(getErrorMessage(error));
         } finally {
@@ -67,15 +68,22 @@ export default function LoginScreen({ navigation }) {
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    autoFocus
+                    returnKeyType="next"
+                    onSubmitEditing={() => senhaInputRef.current.focus()}
+                    blurOnSubmit={false}
                     style={styles.input}
                 />
 
                 <TextInput
+                    ref={senhaInputRef}
                     placeholder="Senha"
                     placeholderTextColor={Colors.placeholder}
                     value={senha}
                     onChangeText={setSenha}
                     secureTextEntry
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
                     style={styles.input}
                 />
 
@@ -89,18 +97,18 @@ export default function LoginScreen({ navigation }) {
                     style={[styles.button, loading && styles.buttonDisabled]}
                     onPress={handleLogin}
                     disabled={loading}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: loading }}
                 >
                     <Text style={[styles.buttonText, { color: Colors.buttonText }]}>
                         {loading ? 'Entrando...' : 'Entrar'}
                     </Text>
                 </TouchableOpacity>
 
-                {/* Link para Recuperar Senha */}
                 <TouchableOpacity onPress={() => navigation.navigate('RecuperarSenha')}>
                     <Text style={[styles.signupText, { color: Colors.textPrimary }]}>Esqueceu a senha?</Text>
                 </TouchableOpacity>
 
-                {/* Link para Cadastro */}
                 <TouchableOpacity onPress={() => navigation.navigate('Cadastro')}>
                     <Text style={[styles.signupText, { color: Colors.textPrimary }]}>Não tem conta? Cadastre-se</Text>
                 </TouchableOpacity>

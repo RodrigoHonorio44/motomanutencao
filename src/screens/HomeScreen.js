@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, FlatList, ScrollView, Image } from 'react
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import styles from '../style/HomeStyles';
 import Colors from '../style/Colors';
+import { Ionicons } from '@expo/vector-icons';
 
 const resumoDados = [
     { id: '1', titulo: 'Motos Cadastradas', valor: 8 },
@@ -30,8 +31,13 @@ export default function HomeScreen({ navigation }) {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-            <View style={styles.header}>
+            <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: 10 }}>
+                    <Ionicons name="menu" size={30} color={Colors.textPrimary} />
+                </TouchableOpacity>
+
                 <Text style={styles.logo}>MotoManutenção</Text>
+
                 <TouchableOpacity onPress={() => navigation.navigate('Perfil')}>
                     <Image
                         source={{ uri: usuario?.photoURL || 'https://via.placeholder.com/40' }}
