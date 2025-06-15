@@ -45,7 +45,6 @@ export default function CadastroScreen({ navigation }) {
             const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
             const user = userCredential.user;
 
-            // Criar o documento na coleção "users"
             await setDoc(doc(db, 'users', user.uid), {
                 email: user.email,
                 criadoEm: new Date(),
@@ -71,7 +70,6 @@ export default function CadastroScreen({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                {/* Título com cor explícita */}
                 <Text style={[styles.titulo, { color: Colors.textPrimary }]}>Cadastro</Text>
 
                 <TextInput
@@ -103,7 +101,7 @@ export default function CadastroScreen({ navigation }) {
                 />
 
                 {errorMsg !== '' && (
-                    <Text style={styles.errorText} accessibilityRole="alert">
+                    <Text style={[styles.errorText, { color: '#ffcccc' }]} accessibilityRole="alert">
                         {errorMsg}
                     </Text>
                 )}
