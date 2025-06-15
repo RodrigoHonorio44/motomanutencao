@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';  // importando ícone
+// src/screens/HomeScreen.js
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, ScrollView, Image } from 'react-native';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import styles from '../style/HomeStyles';
 import Colors from '../style/Colors';
 
@@ -17,17 +18,28 @@ const manutencoesRecentes = [
 ];
 
 export default function HomeScreen({ navigation }) {
+    const auth = getAuth();
+    const [usuario, setUsuario] = useState(null);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setUsuario(user);
+        });
+        return unsubscribe;
+    }, []);
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
             <View style={styles.header}>
                 <Text style={styles.logo}>MotoManutenção</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('Perfil')}>
-                    {/* Ícone de perfil usando MaterialIcons */}
-                    <MaterialIcons name="person" size={40} color={Colors.secondary} />
+                    <Image
+                        source={{ uri: usuario?.photoURL || 'https://via.placeholder.com/40' }}
+                        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary }}
+                    />
                 </TouchableOpacity>
             </View>
 
-            {/* Cards resumo */}
             <View style={styles.resumoContainer}>
                 {resumoDados.map(item => (
                     <View key={item.id} style={styles.cardResumo}>
@@ -37,7 +49,6 @@ export default function HomeScreen({ navigation }) {
                 ))}
             </View>
 
-            {/* Seção manutenções recentes */}
             <Text style={styles.sectionTitle}>Manutenções Recentes</Text>
             <FlatList
                 data={manutencoesRecentes}
@@ -49,10 +60,9 @@ export default function HomeScreen({ navigation }) {
                         <Text style={styles.manutencaoData}>{item.data}</Text>
                     </View>
                 )}
-                scrollEnabled={false} // desabilita o scroll interno pra não conflitar com ScrollView pai
+                scrollEnabled={false}
             />
 
-            {/* Botões principais */}
             <View style={styles.buttonsContainer}>
                 <TouchableOpacity
                     style={styles.primaryButton}

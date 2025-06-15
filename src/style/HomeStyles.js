@@ -1,4 +1,6 @@
 import { StyleSheet, Dimensions } from 'react-native';
+import Colors from './Colors';  // IMPORTAÇÃO necessária para usar Colors.primary
+
 const { width } = Dimensions.get('window');
 
 export default StyleSheet.create({
@@ -22,11 +24,8 @@ export default StyleSheet.create({
         color: '#000367',
     },
 
-    // Como é um ícone, só mantenha o tamanho aqui para margem ou clique
     profileIcon: {
-        // Se quiser, pode manter algum padding ou margem para área clicável
-        // por exemplo:
-        // padding: 5,
+        padding: 5,
     },
 
     resumoContainer: {
@@ -37,13 +36,14 @@ export default StyleSheet.create({
 
     cardResumo: {
         backgroundColor: '#fff',
-        width: (width - 60) / 3, // 3 cards com espaçamento
+        width: (width - 60) / 3,
         padding: 15,
         borderRadius: 12,
         shadowColor: '#000',
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.12,
+        shadowOffset: { width: 0, height: 3 },
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 6,
         alignItems: 'center',
     },
 
@@ -73,6 +73,7 @@ export default StyleSheet.create({
         marginBottom: 12,
         shadowColor: '#000',
         shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 2 },
         shadowRadius: 6,
         elevation: 3,
     },
@@ -127,5 +128,19 @@ export default StyleSheet.create({
         color: '#6A3093',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.primary, // ← aqui precisa do import Colors
     },
 });
