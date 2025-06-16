@@ -12,7 +12,8 @@ export default function RegistrarManutencaoScreen({ navigation }) {
     const [motoSelecionada, setMotoSelecionada] = useState('');
     const [tipo, setTipo] = useState('');
     const [produto, setProduto] = useState('');
-    const [valor, setValor] = useState('');
+    const [valorProduto, setValorProduto] = useState('');  // Valor do produto (ex: óleo, kit relação)
+    const [valorMaoDeObra, setValorMaoDeObra] = useState(''); // Novo: valor da mão de obra
     const [data, setData] = useState('');
     const [km, setKm] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -53,13 +54,22 @@ export default function RegistrarManutencaoScreen({ navigation }) {
         setMotoSelecionada('');
         setTipo('');
         setProduto('');
-        setValor('');
+        setValorProduto('');
+        setValorMaoDeObra('');
         setKm('');
         setData(formatarData(new Date()));
     };
 
     const handleSalvar = async () => {
-        if (!motoSelecionada || !tipo || !produto || !valor || !data || !km) {
+        if (
+            !motoSelecionada ||
+            !tipo ||
+            !produto ||
+            !valorProduto ||
+            !valorMaoDeObra ||
+            !data ||
+            !km
+        ) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
@@ -69,7 +79,8 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 moto: motoSelecionada,
                 tipo,
                 produto,
-                valor: parseFloat(valor.replace(',', '.')),
+                valorProduto: parseFloat(valorProduto.replace(',', '.')),
+                valorMaoDeObra: parseFloat(valorMaoDeObra.replace(',', '.')),
                 data,
                 km,
                 criadoEm: new Date(),
@@ -112,6 +123,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 style={styles.input}
                 placeholderTextColor={Colors.placeholder}
             />
+
             <TextInput
                 placeholder="Nome do Produto (ex: Kit Relação, Óleo)"
                 value={produto}
@@ -119,10 +131,21 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 style={styles.input}
                 placeholderTextColor={Colors.placeholder}
             />
+
             <TextInput
-                placeholder="Valor (R$)"
-                value={valor}
-                onChangeText={setValor}
+                placeholder="Valor do Produto (R$)"
+                value={valorProduto}
+                onChangeText={setValorProduto}
+                style={styles.input}
+                placeholderTextColor={Colors.placeholder}
+                keyboardType="decimal-pad"
+            />
+
+            {/* Novo campo: Valor da Mão de Obra */}
+            <TextInput
+                placeholder="Valor da Mão de Obra (R$)"
+                value={valorMaoDeObra}
+                onChangeText={setValorMaoDeObra}
                 style={styles.input}
                 placeholderTextColor={Colors.placeholder}
                 keyboardType="decimal-pad"

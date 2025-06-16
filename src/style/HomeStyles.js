@@ -1,5 +1,5 @@
 import { StyleSheet, Dimensions } from 'react-native';
-import Colors from './Colors';  // IMPORTAÇÃO necessária para usar Colors.primary
+import Colors from './Colors';  // Continua a importação de Colors
 
 const { width } = Dimensions.get('window');
 
@@ -30,13 +30,14 @@ export default StyleSheet.create({
 
     resumoContainer: {
         flexDirection: 'row',
+        flexWrap: 'wrap',            // Permite quebra de linha
         justifyContent: 'space-between',
         marginBottom: 30,
     },
 
     cardResumo: {
         backgroundColor: '#fff',
-        width: (width - 60) / 3,
+        width: (width - 80) / 3,     // Para caber 3 por linha com espaçamento
         padding: 15,
         borderRadius: 12,
         shadowColor: '#000',
@@ -45,12 +46,14 @@ export default StyleSheet.create({
         shadowRadius: 8,
         elevation: 6,
         alignItems: 'center',
+        marginBottom: 15,
     },
 
     cardTitulo: {
         fontSize: 14,
         color: '#6a3093',
         marginBottom: 10,
+        textAlign: 'center',
     },
 
     cardValor: {
@@ -141,6 +144,60 @@ export default StyleSheet.create({
         height: 40,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: Colors.primary, // ← aqui precisa do import Colors
+        borderColor: Colors.primary,
+    },
+
+    /** MODAL - Atualização de KM **/
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+
+    modalContainer: {
+        backgroundColor: '#fff',
+        padding: 20,
+        borderRadius: 10,
+        width: '100%',
+        maxWidth: 300,
+    },
+
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textAlign: 'center',
+        color: Colors.textPrimary,
+    },
+
+    modalInput: {
+        borderColor: '#ccc',
+        borderWidth: 1,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+    },
+
+    modalButton: {
+        backgroundColor: Colors.primary,
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+
+    modalButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+
+    modalCancel: {
+        marginTop: 10,
+        alignItems: 'center',
+    },
+
+    modalCancelText: {
+        color: Colors.textPrimary,
     },
 });
