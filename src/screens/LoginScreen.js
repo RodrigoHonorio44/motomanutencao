@@ -5,12 +5,14 @@ import { auth } from '../config/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import styles from '../style/LoginStyles';
 import Colors from '../style/Colors';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [loading, setLoading] = useState(false);
     const [mensagem, setMensagem] = useState('');
+    const [mostrarSenha, setMostrarSenha] = useState(false);
     const senhaInputRef = useRef(null);
 
     const getErrorMessage = (error) => {
@@ -61,31 +63,47 @@ export default function LoginScreen({ navigation }) {
                 <Text style={[styles.title, { color: Colors.textPrimary }]}>Bem-vindo!</Text>
                 <Text style={[styles.subtitle, { color: Colors.textPrimary }]}>Faça login para continuar</Text>
 
-                <TextInput
-                    placeholder="Email"
-                    placeholderTextColor={Colors.placeholder}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoFocus
-                    returnKeyType="next"
-                    onSubmitEditing={() => senhaInputRef.current.focus()}
-                    blurOnSubmit={false}
-                    style={styles.input}
-                />
+                {/* Input de Email com ícone */}
+                {/* Input de Email com ícone do lado direito */}
+                <View style={styles.inputWithIcon}>
+                    <TextInput
+                        placeholder="Email"
+                        placeholderTextColor={Colors.placeholder}
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoFocus
+                        returnKeyType="next"
+                        onSubmitEditing={() => senhaInputRef.current.focus()}
+                        blurOnSubmit={false}
+                        style={{ flex: 1, color: Colors.textSecondary }}
+                    />
+                    <Ionicons name="mail-outline" size={24} color={Colors.placeholder} style={{ marginLeft: 10 }} />
+                </View>
 
-                <TextInput
-                    ref={senhaInputRef}
-                    placeholder="Senha"
-                    placeholderTextColor={Colors.placeholder}
-                    value={senha}
-                    onChangeText={setSenha}
-                    secureTextEntry
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                    style={styles.input}
-                />
+
+                {/* Input de Senha com olhinho */}
+                <View style={styles.inputWithIcon}>
+                    <TextInput
+                        ref={senhaInputRef}
+                        placeholder="Senha"
+                        placeholderTextColor={Colors.placeholder}
+                        value={senha}
+                        onChangeText={setSenha}
+                        secureTextEntry={!mostrarSenha}
+                        returnKeyType="done"
+                        onSubmitEditing={handleLogin}
+                        style={{ flex: 1, color: Colors.textSecondary }}
+                    />
+                    <TouchableOpacity onPress={() => setMostrarSenha(!mostrarSenha)}>
+                        <Ionicons
+                            name={mostrarSenha ? 'eye-off' : 'eye'}
+                            size={24}
+                            color={Colors.placeholder}
+                        />
+                    </TouchableOpacity>
+                </View>
 
                 {mensagem !== '' && (
                     <Text style={styles.errorText} accessibilityRole="alert">

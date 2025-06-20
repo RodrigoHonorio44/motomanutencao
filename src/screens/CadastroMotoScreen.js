@@ -19,18 +19,27 @@ export default function CadastroMotoScreen({ navigation }) {
             return;
         }
 
+        // Validação: Ano e KmAtual precisam ser numéricos
+        const anoNumerico = parseInt(ano, 10);
+        const kmAtualNumerico = parseInt(kmAtual, 10);
+
+        if (isNaN(anoNumerico) || isNaN(kmAtualNumerico)) {
+            Alert.alert('Erro', 'Ano e Km Atual devem ser números válidos.');
+            return;
+        }
+
         try {
             await addDoc(collection(db, 'motos'), {
                 marca,
                 modelo,
-                ano,
-                kmAtual,
+                ano: anoNumerico,             // ← Salvar como número
+                kmAtual: kmAtualNumerico,     // ← Salvar como número
                 cor,
                 placa,
                 criadoEm: new Date(),
             });
-            Alert.alert('Sucesso', 'Moto cadastrada!');
-            navigation.navigate('Home');  // Navega para a Home após salvar
+            Alert.alert('Sucesso', 'Moto cadastrada com sucesso!');
+            navigation.navigate('Home');  // Navegar de volta para a Home
         } catch (error) {
             console.log('Erro ao salvar moto:', error);
             Alert.alert('Erro', 'Não foi possível salvar a moto.');

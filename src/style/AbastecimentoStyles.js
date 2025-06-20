@@ -1,73 +1,61 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Colors from './Colors';
-
-const { width } = Dimensions.get('window');
 
 export default StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
-        padding: 20,
+        padding: 16,
     },
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: Colors.primary,
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    pickerContainer: {
-        borderWidth: 1,
-        borderColor: Colors.inputBorder,
-        borderRadius: 8,
-        marginBottom: 15,
-        overflow: 'hidden',
-        backgroundColor: Colors.inputBackground,  // caso queira controlar o fundo
-    },
-    picker: {
-        height: 50,
-        width: '100%',
-        color: Colors.textSecondary,
+        color: Colors.text,
+        marginBottom: 16,
     },
     input: {
-        width: '100%',
-        height: 50,
-        borderColor: Colors.inputBorder,
         borderWidth: 1,
+        borderColor: '#ccc',
         borderRadius: 8,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        fontSize: 16,
-        color: Colors.textSecondary, // Cor do texto digitado
+        padding: 10,
+        marginBottom: 12,
+        color: Colors.text,
     },
     button: {
-        backgroundColor: Colors.secondary,
-        paddingVertical: 15,
+        backgroundColor: Colors.primary,
+        padding: 12,
         borderRadius: 8,
         alignItems: 'center',
-        marginBottom: 20,
-        elevation: 4,
+        marginBottom: 16,
     },
     buttonText: {
         color: Colors.buttonText,
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
-    subtitle: {
-        fontSize: 18,
-        color: Colors.textSecondary,
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    item: {
-        backgroundColor: '#fff',
-        padding: 15,
+    pickerContainer: {
+        borderWidth: 1,
+        borderColor: '#ccc',
         borderRadius: 8,
         marginBottom: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 6,
-        elevation: 3,
+        overflow: 'hidden',         // para evitar borda cortando no Android
+        backgroundColor: Colors.background,  // fundo igual container para melhor visual
+    },
+    picker: {
+        height: 50,
+        color: Colors.text,
+        // no iOS o picker tem estilo próprio, no Android essa cor funciona
+    },
+    subtitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: Colors.subtitle,
+        marginVertical: 12,
+    },
+    item: {
+        backgroundColor: Colors.itemBackground,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 10,
     },
 });

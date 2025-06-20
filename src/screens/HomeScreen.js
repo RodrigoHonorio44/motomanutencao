@@ -1,7 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ScrollView, ActivityIndicator, Modal, TextInput } from 'react-native';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, getDocs, query, orderBy, limit, where, doc, updateDoc } from 'firebase/firestore';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    FlatList,
+    ScrollView,
+    ActivityIndicator,
+    Modal,
+    TextInput,
+} from 'react-native';
+import {
+    getAuth,
+    onAuthStateChanged,
+    signOut,
+} from 'firebase/auth';
+import {
+    collection,
+    getDocs,
+    query,
+    orderBy,
+    limit,
+    where,
+    doc,
+    getDoc,
+    updateDoc,
+} from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import styles from '../style/HomeStyles';
 import Colors from '../style/Colors';
@@ -10,56 +33,89 @@ import { Ionicons } from '@expo/vector-icons';
 export default function HomeScreen({ navigation }) {
     const auth = getAuth();
     const [usuario, setUsuario] = useState(null);
+    const [motoSelecionadaId, setMotoSelecionadaId] = useState(null);
+
     const [manutencoesRecentes, setManutencoesRecentes] = useState([]);
-    const [totalMotos, setTotalMotos] = useState(0);
     const [totalPendentes, setTotalPendentes] = useState(0);
     const [kmTotal, setKmTotal] = useState(0);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [modalVisible, setModalVisible] = useState(false);
+    const [modalKmVisible, setModalKmVisible] = useState(false);
+    const [modalMotosVisible, setModalMotosVisible] = useState(false);
     const [novoKm, setNovoKm] = useState('');
+    const [motosList, setMotosList] = useState([]);
+    const [totalMotos, setTotalMotos] = useState(0);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, user => {
             setUsuario(user);
         });
         return unsubscribe;
     }, []);
 
-    const fetchResumoDados = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchMotos = async () => {
         try {
-            // Total motos
             const motosSnapshot = await getDocs(collection(db, 'motos'));
-            setTotalMotos(motosSnapshot.size);
-
-            // Carregar o KM total da primeira moto (exemplo: moto de id "moto1" - ajuste conforme sua estrutura)
             const motos = [];
-            motosSnapshot.forEach((doc) => {
+            motosSnapshot.forEach(doc => {
                 motos.push({ id: doc.id, ...doc.data() });
             });
-            if (motos.length > 0) {
-                setKmTotal(motos[0].kmTotal || 0);  // Aqui pega o kmTotal da primeira moto
-            }
+            setMotosList(motos);
+            setTotalMotos(motos.length);
 
-            // Total manutenções pendentes
-            const pendentesQuery = query(collection(db, 'manutencoes'), where('status', '==', 'pendente'));
+            if (!motoSelecionadaId && motos.length > 0) {
+                setMotoSelecionadaId(motos[0].id);
+            }
+        } catch (err) {
+            console.error('Erro ao buscar motos:', err);
+            setError('Erro ao carregar motos.');
+        }
+    };
+
+    const fetchDadosMotoSelecionada = async motoId => {
+        if (!motoId) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            // KM total da moto
+            const motoDoc = await getDoc(doc(db, 'motos', motoId));
+            setKmTotal(motoDoc.exists() ? motoDoc.data().kmTotal || 0 : 0);
+
+            // Total de manutenções pendentes dessa moto
+            const pendentesQuery = query(
+                collection(db, 'manutencoes'),
+                where('status', '==', 'pendente'),
+                where('motoId', '==', motoId)
+            );
             const pendentesSnapshot = await getDocs(pendentesQuery);
             setTotalPendentes(pendentesSnapshot.size);
 
-            // Manutenções recentes
-            const recentesQuery = query(collection(db, 'manutencoes'), orderBy('criadoEm', 'desc'), limit(5));
+            // Manutenções recentes de todas as motos (sem filtro por motoId)
+            const recentesQuery = query(
+                collection(db, 'manutencoes'),
+                orderBy('criadoEm', 'desc'),
+                limit(5)
+            );
             const recentesSnapshot = await getDocs(recentesQuery);
             const manutencoes = [];
-            recentesSnapshot.forEach((doc) => {
-                manutencoes.push({ id: doc.id, ...doc.data() });
+            recentesSnapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                manutencoes.push({
+                    id: docSnap.id,
+                    tipo: data.tipo || '',
+                    data: data.data || '',
+                    produto: data.produto || '',
+                    valorMaoDeObra: data.valorMaoDeObra || 0,
+                    km: data.km || '',
+                    motoNome: data.moto || '',
+                });
             });
             setManutencoesRecentes(manutencoes);
-
         } catch (err) {
-            console.error('Erro ao carregar dados:', err);
+            console.error('Erro ao carregar dados da moto:', err);
             setError('Erro ao carregar dados. Tente novamente.');
         } finally {
             setLoading(false);
@@ -67,7 +123,13 @@ export default function HomeScreen({ navigation }) {
     };
 
     useEffect(() => {
-        fetchResumoDados();
+        if (motoSelecionadaId) {
+            fetchDadosMotoSelecionada(motoSelecionadaId);
+        }
+    }, [motoSelecionadaId]);
+
+    useEffect(() => {
+        fetchMotos();
     }, []);
 
     const handleAtualizarKm = async () => {
@@ -78,19 +140,18 @@ export default function HomeScreen({ navigation }) {
                 return;
             }
 
-            const motosSnapshot = await getDocs(collection(db, 'motos'));
-            if (motosSnapshot.empty) return;
+            if (!motoSelecionadaId) {
+                setError('Nenhuma moto selecionada.');
+                return;
+            }
 
-            const motoDoc = motosSnapshot.docs[0]; // Exemplo: atualizando a primeira moto
-            const motoRef = doc(db, 'motos', motoDoc.id);
-
+            const motoRef = doc(db, 'motos', motoSelecionadaId);
             await updateDoc(motoRef, { kmTotal: kmNumber });
 
             setKmTotal(kmNumber);
-            setModalVisible(false);
+            setModalKmVisible(false);
             setNovoKm('');
             setError(null);
-
         } catch (err) {
             console.error('Erro ao atualizar KM:', err);
             setError('Erro ao atualizar o KM.');
@@ -112,9 +173,19 @@ export default function HomeScreen({ navigation }) {
         }
     };
 
+    const handleSelecionarMoto = moto => {
+        setMotoSelecionadaId(moto.id);
+        setModalMotosVisible(false);
+    };
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-            <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <View
+                style={[
+                    styles.header,
+                    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+                ]}
+            >
                 <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: 10 }}>
                     <Ionicons name="menu" size={30} color={Colors.textPrimary} />
                 </TouchableOpacity>
@@ -126,14 +197,10 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
             </View>
 
-            {loading && (
-                <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
-            )}
+            {loading && <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />}
 
             {error && (
-                <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>
-                    {error}
-                </Text>
+                <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>{error}</Text>
             )}
 
             {!loading && !error && (
@@ -144,7 +211,11 @@ export default function HomeScreen({ navigation }) {
                                 key={item.id}
                                 style={styles.cardResumo}
                                 onPress={() => {
-                                    if (item.id === '3') setModalVisible(true); // Só abre o modal no KM
+                                    if (item.id === '1') {
+                                        fetchMotos();
+                                        setModalMotosVisible(true);
+                                    }
+                                    if (item.id === '3') setModalKmVisible(true);
                                 }}
                             >
                                 <Text style={styles.cardTitulo}>{item.titulo}</Text>
@@ -160,9 +231,12 @@ export default function HomeScreen({ navigation }) {
                         keyExtractor={item => item.id}
                         renderItem={({ item }) => (
                             <View style={styles.cardManutencao}>
-                                <Text style={styles.motoNome}>{item.moto}</Text>
-                                <Text style={styles.manutencaoTipo}>{item.tipo}</Text>
-                                <Text style={styles.manutencaoData}>{item.data}</Text>
+                                <Text style={styles.motoNome}>Moto: {item.motoNome}</Text>
+                                <Text>Tipo: {item.tipo}</Text>
+                                <Text>Data: {item.data}</Text>
+                                <Text>Produto: {item.produto}</Text>
+                                <Text>KM: {item.km}</Text>
+                                <Text>Mão de Obra: R$ {item.valorMaoDeObra}</Text>
                             </View>
                         )}
                         scrollEnabled={false}
@@ -172,26 +246,32 @@ export default function HomeScreen({ navigation }) {
 
             {/* Modal para atualizar o KM */}
             <Modal
-                visible={modalVisible}
+                visible={modalKmVisible}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setModalVisible(false)}
+                onRequestClose={() => setModalKmVisible(false)}
             >
-                <View style={{
-                    flex: 1,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    padding: 20,
-                }}>
-                    <View style={{
-                        backgroundColor: '#fff',
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
                         padding: 20,
-                        borderRadius: 10,
-                        width: '100%',
-                        maxWidth: 300,
-                    }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Atualizar KM Total</Text>
+                    }}
+                >
+                    <View
+                        style={{
+                            backgroundColor: '#fff',
+                            padding: 20,
+                            borderRadius: 10,
+                            width: '100%',
+                            maxWidth: 300,
+                        }}
+                    >
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                            Atualizar KM Total
+                        </Text>
                         <TextInput
                             placeholder="Novo KM"
                             keyboardType="numeric"
@@ -218,10 +298,66 @@ export default function HomeScreen({ navigation }) {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={() => setModalVisible(false)}
+                            onPress={() => setModalKmVisible(false)}
                             style={{ marginTop: 10, alignItems: 'center' }}
                         >
                             <Text style={{ color: Colors.textPrimary }}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal de seleção de Moto */}
+            <Modal
+                visible={modalMotosVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setModalMotosVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 20,
+                    }}
+                >
+                    <View
+                        style={{
+                            backgroundColor: '#fff',
+                            padding: 20,
+                            borderRadius: 10,
+                            width: '100%',
+                            maxWidth: 300,
+                            maxHeight: '80%',
+                        }}
+                    >
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                            Selecione uma Moto
+                        </Text>
+                        <FlatList
+                            data={motosList}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    onPress={() => handleSelecionarMoto(item)}
+                                    style={{
+                                        padding: 10,
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: '#ccc',
+                                    }}
+                                >
+                                    <Text>{`${item.marca} ${item.modelo} - ${item.placa}`}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+
+                        <TouchableOpacity
+                            onPress={() => setModalMotosVisible(false)}
+                            style={{ marginTop: 10, alignItems: 'center' }}
+                        >
+                            <Text style={{ color: Colors.textPrimary }}>Fechar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

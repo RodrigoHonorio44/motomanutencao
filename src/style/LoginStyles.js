@@ -43,6 +43,26 @@ export default StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.inputBorder,
     },
+    inputWithIcon: {
+        width: width * 0.85,
+        backgroundColor: Colors.background,
+        borderRadius: 30,
+        paddingVertical: 15,
+        paddingLeft: 20,
+        paddingRight: 15,
+        marginBottom: 15,
+        fontSize: 16,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        borderWidth: 1,
+        borderColor: Colors.inputBorder,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
     button: {
         width: width * 0.85,
         backgroundColor: Colors.button,
@@ -50,7 +70,7 @@ export default StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         marginTop: 10,
-        marginBottom: 20, // margem inferior para espaçamento extra
+        marginBottom: 20,
         elevation: 5,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 3 },
@@ -70,14 +90,6 @@ export default StyleSheet.create({
         marginTop: 15,
         textDecorationLine: 'underline',
         textAlign: 'center',
-    },
-    forgotPasswordText: {
-        // Reutilizando signupText com ajustes
-        color: Colors.textPrimary,
-        marginTop: 10,
-        textAlign: 'center',
-        textDecorationLine: 'underline',
-        fontSize: 14,
     },
     errorText: {
         color: Colors.button,

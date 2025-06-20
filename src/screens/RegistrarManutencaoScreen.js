@@ -109,10 +109,11 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                     {motos.map((moto) => (
                         <Picker.Item
                             key={moto.id}
-                            label={`${moto.marca} ${moto.modelo} (${moto.ano})`}
-                            value={`${moto.marca} ${moto.modelo} (${moto.ano})`}
+                            label={`${moto.marca} ${moto.modelo}  - Placa: ${moto.placa}`}
+                            value={`${moto.marca} ${moto.modelo}  - Placa: ${moto.placa}`}
                         />
                     ))}
+
                 </Picker>
             </View>
 
