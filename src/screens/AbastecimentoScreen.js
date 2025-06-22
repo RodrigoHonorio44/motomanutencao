@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
-import { collection, addDoc, getDocs, orderBy, query, where, doc, updateDoc } from 'firebase/firestore';
+import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { collection, addDoc, getDocs, orderBy, query, where, doc, updateDoc, limit } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import styles from '../style/AbastecimentoStyles';
 import Colors from '../style/Colors';
@@ -19,7 +19,7 @@ export default function AbastecimentoScreen() {
 
     const precosPadrao = {
         Gasolina: '5.70',
-        Álcool: '4.20'
+        Álcool: '4.20',
     };
 
     useEffect(() => {
@@ -27,12 +27,11 @@ export default function AbastecimentoScreen() {
             try {
                 const q = query(collection(db, 'motos'));
                 const snapshot = await getDocs(q);
-                const listaMotos = [];
-                snapshot.forEach(doc => listaMotos.push({ id: doc.id, ...doc.data() }));
+                const listaMotos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setMotos(listaMotos);
                 if (listaMotos.length > 0) setMotoSelecionada(listaMotos[0].id);
             } catch (e) {
-                console.log('Erro ao buscar motos:', e);
+                console.error('Erro ao buscar motos:', e);
             }
         }
         fetchMotos();
@@ -43,34 +42,31 @@ export default function AbastecimentoScreen() {
     }, [tipoCombustivel]);
 
     useEffect(() => {
-        fetchHistorico();
+        if (motoSelecionada) {
+            fetchHistorico();
+        }
     }, [motoSelecionada]);
 
     async function fetchHistorico() {
         try {
-            let q;
-            if (motoSelecionada) {
-                q = query(
-                    collection(db, 'abastecimentos'),
-                    where('motoId', '==', motoSelecionada),
-                    orderBy('data', 'desc')
-                );
-            } else {
-                q = query(collection(db, 'abastecimentos'), orderBy('data', 'desc'));
-            }
+            const q = query(
+                collection(db, 'abastecimentos'),
+                where('motoId', '==', motoSelecionada),
+                orderBy('data', 'desc'),
+                limit(4)
+            );
             const snapshot = await getDocs(q);
-            const list = [];
-            snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setHistorico(list);
             calcularConsumoMedio(list);
         } catch (e) {
-            console.log('Erro ao buscar histórico:', e);
+            console.error('Erro ao buscar histórico:', e);
         }
     }
 
     function calcularConsumoMedio(list) {
         const tipos = ['Gasolina', 'Álcool'];
-        let resultados = {};
+        const resultados = {};
 
         tipos.forEach(tipo => {
             const abastecimentos = list.filter(item => item.tipoCombustivel === tipo);
@@ -86,8 +82,7 @@ export default function AbastecimentoScreen() {
                 }
 
                 if (totalLitros > 0) {
-                    const consumo = (totalKm / totalLitros).toFixed(1);
-                    resultados[tipo] = consumo;
+                    resultados[tipo] = (totalKm / totalLitros).toFixed(1);
                 }
             }
         });
@@ -105,120 +100,161 @@ export default function AbastecimentoScreen() {
             return;
         }
 
+        const litrosFloat = parseFloat(litros.replace(',', '.'));
+        const precoFloat = parseFloat(precoLitro.replace(',', '.'));
+        const kmInt = parseInt(kmAtual, 10);
+
+        if (isNaN(litrosFloat) || isNaN(precoFloat) || isNaN(kmInt)) {
+            Alert.alert('Erro', 'Digite valores numéricos válidos.');
+            return;
+        }
+
         try {
             const novo = {
                 motoId: motoSelecionada,
-                litros: parseFloat(litros.replace(',', '.')),
-                precoLitro: parseFloat(precoLitro.replace(',', '.')),
-                kmAtual: parseInt(kmAtual, 10),
+                litros: litrosFloat,
+                precoLitro: precoFloat,
+                kmAtual: kmInt,
                 tipoCombustivel,
                 data: new Date(),
             };
 
             await addDoc(collection(db, 'abastecimentos'), novo);
 
-            // >>> Atualiza o kmtotal da moto na coleção 'motos'
             const motoRef = doc(db, 'motos', motoSelecionada);
-            await updateDoc(motoRef, {
-                kmtotal: parseInt(kmAtual, 10)
-            });
+            await updateDoc(motoRef, { kmtotal: kmInt });
 
             Alert.alert('Sucesso', 'Abastecimento salvo e km da moto atualizado!');
             setLitros('');
+            setPrecoLitro(precosPadrao[tipoCombustivel]);
             setKmAtual('');
             fetchHistorico();
         } catch (e) {
-            console.log('Erro ao salvar:', e);
+            console.error('Erro ao salvar:', e);
             Alert.alert('Erro', 'Não foi possível salvar.');
         }
     }
 
+    // RENDERIZAÇÃO PRINCIPAL COM FlatList
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Lançar Abastecimento</Text>
-
-            {/* Picker para escolher a moto */}
-            <View style={styles.pickerContainer}>
-                <Picker
-                    selectedValue={motoSelecionada}
-                    onValueChange={(itemValue) => setMotoSelecionada(itemValue)}
-                    style={styles.picker}
-                >
-                    {motos.map(moto => (
-                        <Picker.Item key={moto.id} label={moto.nomeMoto || 'Moto sem nome'} value={moto.id} />
-                    ))}
-                </Picker>
-            </View>
-
-            {/* Picker para tipo de combustível */}
-            <View style={styles.pickerContainer}>
-                <Picker
-                    selectedValue={tipoCombustivel}
-                    onValueChange={(itemValue) => setTipoCombustivel(itemValue)}
-                    style={styles.picker}
-                >
-                    <Picker.Item label="Gasolina" value="Gasolina" />
-                    <Picker.Item label="Álcool" value="Álcool" />
-                </Picker>
-            </View>
-
-            <TextInput
-                placeholder="Preço por Litro (R$)"
-                placeholderTextColor={Colors.placeholder}
-                keyboardType="decimal-pad"
-                style={styles.input}
-                value={precoLitro}
-                onChangeText={setPrecoLitro}
-            />
-
-            <TextInput
-                placeholder="Litros abastecidos"
-                placeholderTextColor={Colors.placeholder}
-                keyboardType="decimal-pad"
-                style={styles.input}
-                value={litros}
-                onChangeText={setLitros}
-            />
-
-            <TextInput
-                placeholder="Km atual da moto"
-                placeholderTextColor={Colors.placeholder}
-                keyboardType="numeric"
-                style={styles.input}
-                value={kmAtual}
-                onChangeText={setKmAtual}
-            />
-
-            <TouchableOpacity style={styles.button} onPress={handleSalvar}>
-                <Text style={styles.buttonText}>Salvar</Text>
-            </TouchableOpacity>
-
-            <View style={{ marginTop: 15 }}>
-                {Object.keys(consumoMedio).length === 0 ? (
-                    <Text style={styles.subtitle}>Consumo médio ainda não disponível</Text>
-                ) : (
-                    Object.entries(consumoMedio).map(([tipo, consumo]) => (
-                        <Text key={tipo} style={styles.subtitle}>
-                            Consumo médio com {tipo} = {consumo} km/l
-                        </Text>
-                    ))
-                )}
-            </View>
-
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+        >
             <FlatList
                 data={historico}
                 keyExtractor={item => item.id}
+                ListHeaderComponent={
+                    <>
+                        <Text style={styles.title}>Lançar Abastecimento</Text>
+
+                        {/* Picker de Moto */}
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={motoSelecionada}
+                                onValueChange={setMotoSelecionada}
+                                style={styles.picker}
+                            >
+                                {motos.map(moto => (
+                                    <Picker.Item
+                                        key={moto.id}
+                                        label={`${moto.marca.trim()} ${moto.modelo.trim()} - Placa: ${moto.placa.trim()}`}
+                                        value={moto.id}
+                                    />
+                                ))}
+                            </Picker>
+                        </View>
+
+                        {/* Picker de Combustível */}
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={tipoCombustivel}
+                                onValueChange={setTipoCombustivel}
+                                style={styles.picker}
+                            >
+                                <Picker.Item label="Gasolina" value="Gasolina" />
+                                <Picker.Item label="Álcool" value="Álcool" />
+                            </Picker>
+                        </View>
+
+                        {/* Campos de entrada */}
+                        <TextInput
+                            placeholder="Preço por Litro (R$)"
+                            placeholderTextColor={Colors.placeholder}
+                            keyboardType="decimal-pad"
+                            style={styles.input}
+                            value={precoLitro}
+                            onChangeText={setPrecoLitro}
+                        />
+
+                        <TextInput
+                            placeholder="Litros abastecidos"
+                            placeholderTextColor={Colors.placeholder}
+                            keyboardType="decimal-pad"
+                            style={styles.input}
+                            value={litros}
+                            onChangeText={setLitros}
+                        />
+
+                        <TextInput
+                            placeholder="Km atual da moto"
+                            placeholderTextColor={Colors.placeholder}
+                            keyboardType="numeric"
+                            style={styles.input}
+                            value={kmAtual}
+                            onChangeText={setKmAtual}
+                        />
+
+                        <TouchableOpacity style={styles.button} onPress={handleSalvar}>
+                            <Text style={styles.buttonText}>Salvar</Text>
+                        </TouchableOpacity>
+
+                        {/* Consumo médio */}
+                        <View style={{ marginTop: 15 }}>
+                            {Object.keys(consumoMedio).length === 0 ? (
+                                <Text style={styles.subtitle}>Consumo médio ainda não disponível</Text>
+                            ) : (
+                                Object.entries(consumoMedio).map(([tipo, consumo]) => (
+                                    <Text key={tipo} style={styles.subtitle}>
+                                        Consumo médio com {tipo} = {consumo} km/l
+                                    </Text>
+                                ))
+                            )}
+                        </View>
+
+                        <Text style={[styles.title, { marginTop: 20 }]}>Últimos Abastecimentos</Text>
+                    </>
+                }
                 renderItem={({ item }) => (
-                    <View style={styles.item}>
-                        <Text>Data: {new Date(item.data.seconds * 1000).toLocaleDateString()}</Text>
+                    <View
+                        style={{
+                            backgroundColor: '#fff',
+                            padding: 12,
+                            marginBottom: 10,
+                            borderRadius: 8,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 4,
+                            elevation: 3,
+                        }}
+                    >
+                        <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>
+                            Data:{' '}
+                            {item.data?.seconds
+                                ? new Date(item.data.seconds * 1000).toLocaleDateString('pt-BR')
+                                : ''}
+                        </Text>
                         <Text>Combustível: {item.tipoCombustivel}</Text>
-                        <Text>Km: {item.kmAtual}</Text>
+                        <Text>Km Atual: {item.kmAtual}</Text>
                         <Text>Litros: {item.litros}</Text>
                         <Text>Preço por Litro: R$ {item.precoLitro.toFixed(2)}</Text>
                     </View>
                 )}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                ListEmptyComponent={<Text style={styles.subtitle}>Nenhum abastecimento cadastrado.</Text>}
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
             />
-        </View>
+        </KeyboardAvoidingView>
     );
 }

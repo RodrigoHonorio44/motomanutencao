@@ -4,10 +4,10 @@ import {
     Text,
     TouchableOpacity,
     FlatList,
-    ScrollView,
     ActivityIndicator,
     Modal,
     TextInput,
+    Alert,
 } from 'react-native';
 import {
     getAuth,
@@ -74,17 +74,15 @@ export default function HomeScreen({ navigation }) {
         }
     };
 
-    const fetchDadosMotoSelecionada = async motoId => {
+    const fetchDadosMotoSelecionada = async (motoId) => {
         if (!motoId) return;
         setLoading(true);
         setError(null);
 
         try {
-            // KM total da moto
             const motoDoc = await getDoc(doc(db, 'motos', motoId));
-            setKmTotal(motoDoc.exists() ? motoDoc.data().kmTotal || 0 : 0);
+            setKmTotal(motoDoc.exists() ? motoDoc.data().kmtotal || 0 : 0);
 
-            // Total de manutenções pendentes dessa moto
             const pendentesQuery = query(
                 collection(db, 'manutencoes'),
                 where('status', '==', 'pendente'),
@@ -93,26 +91,32 @@ export default function HomeScreen({ navigation }) {
             const pendentesSnapshot = await getDocs(pendentesQuery);
             setTotalPendentes(pendentesSnapshot.size);
 
-            // Manutenções recentes de todas as motos (sem filtro por motoId)
             const recentesQuery = query(
                 collection(db, 'manutencoes'),
+                where('motoId', '==', motoId),
                 orderBy('criadoEm', 'desc'),
                 limit(5)
             );
             const recentesSnapshot = await getDocs(recentesQuery);
+
             const manutencoes = [];
             recentesSnapshot.forEach(docSnap => {
                 const data = docSnap.data();
+                const moto = motosList.find(m => m.id === motoId) || {};
+
                 manutencoes.push({
                     id: docSnap.id,
                     tipo: data.tipo || '',
                     data: data.data || '',
                     produto: data.produto || '',
+                    valorProduto: data.valorProduto || 0,
                     valorMaoDeObra: data.valorMaoDeObra || 0,
                     km: data.km || '',
-                    motoNome: data.moto || '',
+                    motoNome: moto.marca && moto.modelo ? `${moto.marca} ${moto.modelo}` : '',
+                    motoPlaca: moto.placa || '',
                 });
             });
+
             setManutencoesRecentes(manutencoes);
         } catch (err) {
             console.error('Erro ao carregar dados da moto:', err);
@@ -126,7 +130,7 @@ export default function HomeScreen({ navigation }) {
         if (motoSelecionadaId) {
             fetchDadosMotoSelecionada(motoSelecionadaId);
         }
-    }, [motoSelecionadaId]);
+    }, [motoSelecionadaId, motosList]);
 
     useEffect(() => {
         fetchMotos();
@@ -146,16 +150,30 @@ export default function HomeScreen({ navigation }) {
             }
 
             const motoRef = doc(db, 'motos', motoSelecionadaId);
-            await updateDoc(motoRef, { kmTotal: kmNumber });
+            await updateDoc(motoRef, { kmtotal: kmNumber });
 
             setKmTotal(kmNumber);
             setModalKmVisible(false);
             setNovoKm('');
             setError(null);
+            Alert.alert('Sucesso', 'KM atualizado com sucesso!');
         } catch (err) {
             console.error('Erro ao atualizar KM:', err);
             setError('Erro ao atualizar o KM.');
         }
+    };
+
+    const formatarData = (data) => {
+        if (!data) return '';
+        if (typeof data === 'string') return data;
+        if (data.seconds) {
+            const dateObj = new Date(data.seconds * 1000);
+            return dateObj.toLocaleDateString('pt-BR');
+        }
+        if (data.toDate) {
+            return data.toDate().toLocaleDateString('pt-BR');
+        }
+        return '';
     };
 
     const resumoDados = [
@@ -178,71 +196,70 @@ export default function HomeScreen({ navigation }) {
         setModalMotosVisible(false);
     };
 
+    if (loading) {
+        return <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />;
+    }
+
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-            <View
-                style={[
-                    styles.header,
-                    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-                ]}
-            >
-                <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: 10 }}>
-                    <Ionicons name="menu" size={30} color={Colors.textPrimary} />
-                </TouchableOpacity>
-
-                <Text style={styles.logo}>MotoManutenção</Text>
-
-                <TouchableOpacity onPress={handleLogout} style={{ padding: 8 }}>
-                    <Ionicons name="log-out-outline" size={28} color="red" />
-                </TouchableOpacity>
-            </View>
-
-            {loading && <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />}
-
-            {error && (
-                <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>{error}</Text>
-            )}
-
-            {!loading && !error && (
-                <>
-                    <View style={styles.resumoContainer}>
-                        {resumoDados.map(item => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={styles.cardResumo}
-                                onPress={() => {
-                                    if (item.id === '1') {
-                                        fetchMotos();
-                                        setModalMotosVisible(true);
-                                    }
-                                    if (item.id === '3') setModalKmVisible(true);
-                                }}
-                            >
-                                <Text style={styles.cardTitulo}>{item.titulo}</Text>
-                                <Text style={styles.cardValor}>{item.valor}</Text>
+        <>
+            <FlatList
+                data={manutencoesRecentes}
+                keyExtractor={item => item.id}
+                ListHeaderComponent={
+                    <>
+                        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                            <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: 10 }}>
+                                <Ionicons name="menu" size={30} color={Colors.textPrimary} />
                             </TouchableOpacity>
-                        ))}
-                    </View>
 
-                    <Text style={styles.sectionTitle}>Manutenções Recentes</Text>
+                            <Text style={styles.logo}>MotoManutenção</Text>
 
-                    <FlatList
-                        data={manutencoesRecentes}
-                        keyExtractor={item => item.id}
-                        renderItem={({ item }) => (
-                            <View style={styles.cardManutencao}>
-                                <Text style={styles.motoNome}>Moto: {item.motoNome}</Text>
-                                <Text>Tipo: {item.tipo}</Text>
-                                <Text>Data: {item.data}</Text>
-                                <Text>Produto: {item.produto}</Text>
-                                <Text>KM: {item.km}</Text>
-                                <Text>Mão de Obra: R$ {item.valorMaoDeObra}</Text>
-                            </View>
+                            <TouchableOpacity onPress={handleLogout} style={{ padding: 8 }}>
+                                <Ionicons name="log-out-outline" size={28} color="red" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {error && (
+                            <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>{error}</Text>
                         )}
-                        scrollEnabled={false}
-                    />
-                </>
-            )}
+
+                        <View style={styles.resumoContainer}>
+                            {resumoDados.map(item => (
+                                <TouchableOpacity
+                                    key={item.id}
+                                    style={styles.cardResumo}
+                                    onPress={() => {
+                                        if (item.id === '1') {
+                                            fetchMotos();
+                                            setModalMotosVisible(true);
+                                        }
+                                        if (item.id === '3') setModalKmVisible(true);
+                                    }}
+                                >
+                                    <Text style={styles.cardTitulo}>{item.titulo}</Text>
+                                    <Text style={styles.cardValor}>{item.valor}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.sectionTitle}>Manutenções Recentes</Text>
+                    </>
+                }
+                renderItem={({ item }) => (
+                    <View style={styles.cardManutencao}>
+                        <Text style={styles.motoNome}>
+                            Moto: {item.motoNome} - Placa: {item.motoPlaca}
+                        </Text>
+                        <Text>Tipo: {item.tipo}</Text>
+                        <Text>Data: {formatarData(item.data)}</Text>
+                        <Text>Produto: {item.produto}</Text>
+                        <Text>Valor do Produto: R$ {Number(item.valorProduto).toFixed(2)}</Text>
+                        <Text>KM: {item.km}</Text>
+                        <Text>Mão de Obra: R$ {item.valorMaoDeObra.toFixed(2)}</Text>
+                    </View>
+                )}
+                ListFooterComponent={<View style={{ height: 30 }} />}
+            />
 
             {/* Modal para atualizar o KM */}
             <Modal
@@ -251,56 +268,23 @@ export default function HomeScreen({ navigation }) {
                 animationType="slide"
                 onRequestClose={() => setModalKmVisible(false)}
             >
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 20,
-                    }}
-                >
-                    <View
-                        style={{
-                            backgroundColor: '#fff',
-                            padding: 20,
-                            borderRadius: 10,
-                            width: '100%',
-                            maxWidth: 300,
-                        }}
-                    >
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-                            Atualizar KM Total
-                        </Text>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '100%', maxWidth: 300 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Atualizar KM Total</Text>
                         <TextInput
                             placeholder="Novo KM"
                             keyboardType="numeric"
                             value={novoKm}
                             onChangeText={setNovoKm}
-                            style={{
-                                borderColor: '#ccc',
-                                borderWidth: 1,
-                                padding: 10,
-                                borderRadius: 8,
-                                marginBottom: 15,
-                            }}
+                            style={{ borderColor: '#ccc', borderWidth: 1, padding: 10, borderRadius: 8, marginBottom: 15 }}
                         />
                         <TouchableOpacity
                             onPress={handleAtualizarKm}
-                            style={{
-                                backgroundColor: Colors.primary,
-                                padding: 12,
-                                borderRadius: 8,
-                                alignItems: 'center',
-                            }}
+                            style={{ backgroundColor: Colors.primary, padding: 12, borderRadius: 8, alignItems: 'center' }}
                         >
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>Salvar KM</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => setModalKmVisible(false)}
-                            style={{ marginTop: 10, alignItems: 'center' }}
-                        >
+                        <TouchableOpacity onPress={() => setModalKmVisible(false)} style={{ marginTop: 10, alignItems: 'center' }}>
                             <Text style={{ color: Colors.textPrimary }}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
@@ -314,54 +298,27 @@ export default function HomeScreen({ navigation }) {
                 animationType="slide"
                 onRequestClose={() => setModalMotosVisible(false)}
             >
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 20,
-                    }}
-                >
-                    <View
-                        style={{
-                            backgroundColor: '#fff',
-                            padding: 20,
-                            borderRadius: 10,
-                            width: '100%',
-                            maxWidth: 300,
-                            maxHeight: '80%',
-                        }}
-                    >
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-                            Selecione uma Moto
-                        </Text>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '100%', maxWidth: 300, maxHeight: '80%' }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Selecione uma Moto</Text>
                         <FlatList
                             data={motosList}
                             keyExtractor={item => item.id}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     onPress={() => handleSelecionarMoto(item)}
-                                    style={{
-                                        padding: 10,
-                                        borderBottomWidth: 1,
-                                        borderBottomColor: '#ccc',
-                                    }}
+                                    style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#ccc' }}
                                 >
                                     <Text>{`${item.marca} ${item.modelo} - ${item.placa}`}</Text>
                                 </TouchableOpacity>
                             )}
                         />
-
-                        <TouchableOpacity
-                            onPress={() => setModalMotosVisible(false)}
-                            style={{ marginTop: 10, alignItems: 'center' }}
-                        >
+                        <TouchableOpacity onPress={() => setModalMotosVisible(false)} style={{ marginTop: 10, alignItems: 'center' }}>
                             <Text style={{ color: Colors.textPrimary }}>Fechar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
-        </ScrollView>
+        </>
     );
 }

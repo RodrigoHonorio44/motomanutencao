@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import styles from '../style/CadastroMotoStyles';
@@ -19,7 +19,6 @@ export default function CadastroMotoScreen({ navigation }) {
             return;
         }
 
-        // Validação: Ano e KmAtual precisam ser numéricos
         const anoNumerico = parseInt(ano, 10);
         const kmAtualNumerico = parseInt(kmAtual, 10);
 
@@ -30,16 +29,25 @@ export default function CadastroMotoScreen({ navigation }) {
 
         try {
             await addDoc(collection(db, 'motos'), {
-                marca,
-                modelo,
-                ano: anoNumerico,             // ← Salvar como número
-                kmAtual: kmAtualNumerico,     // ← Salvar como número
-                cor,
-                placa,
+                marca: marca.trim(),
+                modelo: modelo.trim(),
+                ano: anoNumerico,
+                kmAtual: kmAtualNumerico,
+                cor: cor.trim(),
+                placa: placa.trim().toUpperCase(),
                 criadoEm: new Date(),
             });
             Alert.alert('Sucesso', 'Moto cadastrada com sucesso!');
-            navigation.navigate('Home');  // Navegar de volta para a Home
+
+            // Limpar campos para novo cadastro, se quiser:
+            setMarca('');
+            setModelo('');
+            setAno('');
+            setKmAtual('');
+            setCor('');
+            setPlaca('');
+
+            navigation.navigate('Home');
         } catch (error) {
             console.log('Erro ao salvar moto:', error);
             Alert.alert('Erro', 'Não foi possível salvar a moto.');
@@ -47,59 +55,68 @@ export default function CadastroMotoScreen({ navigation }) {
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Cadastrar Moto</Text>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <ScrollView contentContainerStyle={styles.container}>
+                <Text style={styles.title}>Cadastrar Moto</Text>
 
-            <TextInput
-                placeholder="Marca"
-                value={marca}
-                onChangeText={setMarca}
-                style={styles.input}
-                placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-                placeholder="Modelo"
-                value={modelo}
-                onChangeText={setModelo}
-                style={styles.input}
-                placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-                placeholder="Ano"
-                value={ano}
-                onChangeText={setAno}
-                style={styles.input}
-                keyboardType="numeric"
-                placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-                placeholder="Km Atual"
-                value={kmAtual}
-                onChangeText={setKmAtual}
-                style={styles.input}
-                keyboardType="numeric"
-                placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-                placeholder="Cor do Veículo"
-                value={cor}
-                onChangeText={setCor}
-                style={styles.input}
-                placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-                placeholder="Placa"
-                value={placa}
-                onChangeText={setPlaca}
-                style={styles.input}
-                placeholderTextColor={Colors.placeholder}
-                autoCapitalize="characters"
-                maxLength={8}
-            />
+                <TextInput
+                    placeholder="Marca"
+                    value={marca}
+                    onChangeText={setMarca}
+                    style={styles.input}
+                    placeholderTextColor={Colors.placeholder}
+                    autoCapitalize="words"
+                />
+                <TextInput
+                    placeholder="Modelo"
+                    value={modelo}
+                    onChangeText={setModelo}
+                    style={styles.input}
+                    placeholderTextColor={Colors.placeholder}
+                    autoCapitalize="words"
+                />
+                <TextInput
+                    placeholder="Ano"
+                    value={ano}
+                    onChangeText={setAno}
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholderTextColor={Colors.placeholder}
+                    maxLength={4}
+                />
+                <TextInput
+                    placeholder="Km Atual"
+                    value={kmAtual}
+                    onChangeText={setKmAtual}
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholderTextColor={Colors.placeholder}
+                />
+                <TextInput
+                    placeholder="Cor do Veículo"
+                    value={cor}
+                    onChangeText={setCor}
+                    style={styles.input}
+                    placeholderTextColor={Colors.placeholder}
+                    autoCapitalize="words"
+                />
+                <TextInput
+                    placeholder="Placa"
+                    value={placa}
+                    onChangeText={setPlaca}
+                    style={styles.input}
+                    placeholderTextColor={Colors.placeholder}
+                    autoCapitalize="characters"
+                    maxLength={8}
+                />
 
-            <TouchableOpacity style={styles.button} onPress={handleSalvarMoto}>
-                <Text style={styles.buttonText}>Salvar Moto</Text>
-            </TouchableOpacity>
-        </View>
+                <TouchableOpacity style={styles.button} onPress={handleSalvarMoto}>
+                    <Text style={styles.buttonText}>Salvar Moto</Text>
+                </TouchableOpacity>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }

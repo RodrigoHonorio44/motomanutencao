@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,18 +12,11 @@ export default function RegistrarManutencaoScreen({ navigation }) {
     const [motoSelecionada, setMotoSelecionada] = useState('');
     const [tipo, setTipo] = useState('');
     const [produto, setProduto] = useState('');
-    const [valorProduto, setValorProduto] = useState('');  // Valor do produto (ex: óleo, kit relação)
-    const [valorMaoDeObra, setValorMaoDeObra] = useState(''); // Novo: valor da mão de obra
-    const [data, setData] = useState('');
+    const [valorProduto, setValorProduto] = useState('');
+    const [valorMaoDeObra, setValorMaoDeObra] = useState('');
+    const [data, setData] = useState(new Date());
     const [km, setKm] = useState('');
     const [showDatePicker, setShowDatePicker] = useState(false);
-
-    const formatarData = (date) => {
-        const dia = String(date.getDate()).padStart(2, '0');
-        const mes = String(date.getMonth() + 1).padStart(2, '0');
-        const ano = date.getFullYear();
-        return `${dia}/${mes}/${ano}`;
-    };
 
     useEffect(() => {
         const fetchMotos = async () => {
@@ -40,13 +33,19 @@ export default function RegistrarManutencaoScreen({ navigation }) {
         };
 
         fetchMotos();
-        setData(formatarData(new Date()));
     }, []);
+
+    const formatarData = (date) => {
+        const dia = String(date.getDate()).padStart(2, '0');
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const ano = date.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+    };
 
     const onChangeDate = (event, selectedDate) => {
         setShowDatePicker(Platform.OS === 'ios');
         if (selectedDate) {
-            setData(formatarData(selectedDate));
+            setData(selectedDate);
         }
     };
 
@@ -57,37 +56,51 @@ export default function RegistrarManutencaoScreen({ navigation }) {
         setValorProduto('');
         setValorMaoDeObra('');
         setKm('');
-        setData(formatarData(new Date()));
+        setData(new Date());
     };
 
     const handleSalvar = async () => {
         if (
             !motoSelecionada ||
-            !tipo ||
-            !produto ||
-            !valorProduto ||
-            !valorMaoDeObra ||
-            !data ||
-            !km
+            !tipo.trim() ||
+            !produto.trim() ||
+            !valorProduto.trim() ||
+            !valorMaoDeObra.trim() ||
+            !km.trim()
         ) {
             Alert.alert('Erro', 'Preencha todos os campos.');
             return;
         }
 
+        const valorProdutoFloat = parseFloat(valorProduto.replace(',', '.'));
+        const valorMaoDeObraFloat = parseFloat(valorMaoDeObra.replace(',', '.'));
+        const kmInt = parseInt(km, 10);
+
+        if (isNaN(valorProdutoFloat) || isNaN(valorMaoDeObraFloat) || isNaN(kmInt)) {
+            Alert.alert('Erro', 'Digite valores numéricos válidos para valores e km.');
+            return;
+        }
+
         try {
+            // 1. Salva a manutenção
             await addDoc(collection(db, 'manutencoes'), {
-                moto: motoSelecionada,
-                tipo,
-                produto,
-                valorProduto: parseFloat(valorProduto.replace(',', '.')),
-                valorMaoDeObra: parseFloat(valorMaoDeObra.replace(',', '.')),
-                data,
-                km,
+                motoId: motoSelecionada,
+                tipo: tipo.trim(),
+                produto: produto.trim(),
+                valorProduto: valorProdutoFloat,
+                valorMaoDeObra: valorMaoDeObraFloat,
+                data: data,
+                km: kmInt,
                 criadoEm: new Date(),
             });
-            Alert.alert('Sucesso', 'Manutenção registrada!');
+
+            // 2. Atualiza o kmtotal da moto na coleção motos
+            const motoRef = doc(db, 'motos', motoSelecionada);
+            await updateDoc(motoRef, { kmtotal: kmInt });
+
+            Alert.alert('Sucesso', 'Manutenção registrada e KM da moto atualizado!');
             limparCampos();
-            // navigation.goBack(); // opcional
+            // navigation.goBack(); // Se quiser voltar automaticamente
         } catch (error) {
             console.log('Erro ao salvar manutenção:', error);
             Alert.alert('Erro', 'Não foi possível salvar a manutenção.');
@@ -101,7 +114,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
             <View style={styles.pickerContainer}>
                 <Picker
                     selectedValue={motoSelecionada}
-                    onValueChange={(itemValue) => setMotoSelecionada(itemValue)}
+                    onValueChange={setMotoSelecionada}
                     style={styles.picker}
                     itemStyle={{ fontSize: 16 }}
                 >
@@ -109,11 +122,10 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                     {motos.map((moto) => (
                         <Picker.Item
                             key={moto.id}
-                            label={`${moto.marca} ${moto.modelo}  - Placa: ${moto.placa}`}
-                            value={`${moto.marca} ${moto.modelo}  - Placa: ${moto.placa}`}
+                            label={`${moto.marca} ${moto.modelo} - Placa: ${moto.placa}`}
+                            value={moto.id}
                         />
                     ))}
-
                 </Picker>
             </View>
 
@@ -142,7 +154,6 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 keyboardType="decimal-pad"
             />
 
-            {/* Novo campo: Valor da Mão de Obra */}
             <TextInput
                 placeholder="Valor da Mão de Obra (R$)"
                 value={valorMaoDeObra}
@@ -157,12 +168,13 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 onPress={() => setShowDatePicker(true)}
             >
                 <Text style={{ color: data ? '#000' : Colors.placeholder, fontSize: 16 }}>
-                    {data || 'Selecione a Data'}
+                    {formatarData(data)}
                 </Text>
             </TouchableOpacity>
+
             {showDatePicker && (
                 <DateTimePicker
-                    value={new Date()}
+                    value={data}
                     mode="date"
                     display="default"
                     onChange={onChangeDate}

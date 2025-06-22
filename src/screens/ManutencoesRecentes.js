@@ -11,7 +11,6 @@ export default function ManutencoesRecentes({ motoId }) {
         async function fetchManutencoes() {
             setLoading(true);
             try {
-                // Consulta Firestore com filtro e ordenação
                 const q = query(
                     collection(db, 'manutencoes'),
                     where('motoId', '==', motoId),
@@ -51,11 +50,12 @@ export default function ManutencoesRecentes({ motoId }) {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
                 <View style={{ padding: 10, borderBottomWidth: 1, borderColor: '#ccc' }}>
-                    <Text>Tipo: {item.tipo}</Text>
+                    <Text style={{ fontWeight: 'bold' }}>Tipo: {item.tipo}</Text>
                     <Text>Data: {item.data}</Text>
                     <Text>KM: {item.km}</Text>
                     <Text>Produto: {item.produto}</Text>
-                    <Text>Mão de Obra: R$ {item.valorMaoDeObra}</Text>
+                    <Text>Valor do Produto: R$ {Number(item.valorProduto).toFixed(2)}</Text>
+                    <Text>Mão de Obra: R$ {Number(item.valorMaoDeObra).toFixed(2)}</Text>
                 </View>
             )}
         />
