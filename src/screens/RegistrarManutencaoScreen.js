@@ -11,6 +11,8 @@ export default function RegistrarManutencaoScreen({ navigation }) {
     const [motos, setMotos] = useState([]);
     const [motoSelecionada, setMotoSelecionada] = useState('');
     const [tipo, setTipo] = useState('');
+    const [tipoPersonalizado, setTipoPersonalizado] = useState('');
+    const [tiposDeServico, setTiposDeServico] = useState([]);
     const [produto, setProduto] = useState('');
     const [valorProduto, setValorProduto] = useState('');
     const [valorMaoDeObra, setValorMaoDeObra] = useState('');
@@ -32,7 +34,22 @@ export default function RegistrarManutencaoScreen({ navigation }) {
             }
         };
 
+        const fetchTiposDeServico = async () => {
+            try {
+                const pecasSnapshot = await getDocs(collection(db, 'pecas_manutencao'));
+                const tipos = [];
+                pecasSnapshot.forEach(doc => {
+                    const peca = doc.data();
+                    tipos.push(peca.nome);
+                });
+                setTiposDeServico(tipos);
+            } catch (error) {
+                console.log('Erro ao buscar tipos de serviço:', error);
+            }
+        };
+
         fetchMotos();
+        fetchTiposDeServico();
     }, []);
 
     const formatarData = (date) => {
@@ -52,6 +69,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
     const limparCampos = () => {
         setMotoSelecionada('');
         setTipo('');
+        setTipoPersonalizado('');
         setProduto('');
         setValorProduto('');
         setValorMaoDeObra('');
@@ -60,9 +78,11 @@ export default function RegistrarManutencaoScreen({ navigation }) {
     };
 
     const handleSalvar = async () => {
+        const tipoFinal = tipo === 'Outros' ? tipoPersonalizado.trim() : tipo.trim();
+
         if (
             !motoSelecionada ||
-            !tipo.trim() ||
+            !tipoFinal ||
             !produto.trim() ||
             !valorProduto.trim() ||
             !valorMaoDeObra.trim() ||
@@ -82,10 +102,10 @@ export default function RegistrarManutencaoScreen({ navigation }) {
         }
 
         try {
-            // 1. Salva a manutenção
+            // Salva a manutenção
             await addDoc(collection(db, 'manutencoes'), {
                 motoId: motoSelecionada,
-                tipo: tipo.trim(),
+                tipo: tipoFinal,
                 produto: produto.trim(),
                 valorProduto: valorProdutoFloat,
                 valorMaoDeObra: valorMaoDeObraFloat,
@@ -94,7 +114,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 criadoEm: new Date(),
             });
 
-            // 2. Atualiza o kmtotal da moto na coleção motos
+            // Atualiza o kmtotal da moto
             const motoRef = doc(db, 'motos', motoSelecionada);
             await updateDoc(motoRef, { kmtotal: kmInt });
 
@@ -111,6 +131,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
         <View style={styles.container}>
             <Text style={styles.title}>Registrar Manutenção</Text>
 
+            {/* Picker de Moto */}
             <View style={styles.pickerContainer}>
                 <Picker
                     selectedValue={motoSelecionada}
@@ -129,14 +150,36 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 </Picker>
             </View>
 
-            <TextInput
-                placeholder="Tipo de Serviço"
-                value={tipo}
-                onChangeText={setTipo}
-                style={styles.input}
-                placeholderTextColor={Colors.placeholder}
-            />
+            {/* Picker de Tipo de Serviço */}
+            <View style={styles.pickerContainer}>
+                <Picker
+                    selectedValue={tipo}
+                    onValueChange={(val) => {
+                        setTipo(val);
+                        if (val !== 'Outros') setTipoPersonalizado('');
+                    }}
+                    style={styles.picker}
+                >
+                    <Picker.Item label="Selecione o Tipo de Serviço" value="" />
+                    {tiposDeServico.map((item, index) => (
+                        <Picker.Item key={index} label={item} value={item} />
+                    ))}
+                    <Picker.Item label="Outros (digite abaixo)" value="Outros" />
+                </Picker>
+            </View>
 
+            {/* Campo para digitar tipo personalizado */}
+            {tipo === 'Outros' && (
+                <TextInput
+                    placeholder="Digite o tipo de serviço"
+                    value={tipoPersonalizado}
+                    onChangeText={setTipoPersonalizado}
+                    style={styles.input}
+                    placeholderTextColor={Colors.placeholder}
+                />
+            )}
+
+            {/* Campo de Produto */}
             <TextInput
                 placeholder="Nome do Produto (ex: Kit Relação, Óleo)"
                 value={produto}
@@ -145,6 +188,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 placeholderTextColor={Colors.placeholder}
             />
 
+            {/* Valor do Produto */}
             <TextInput
                 placeholder="Valor do Produto (R$)"
                 value={valorProduto}
@@ -154,6 +198,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 keyboardType="decimal-pad"
             />
 
+            {/* Valor da Mão de Obra */}
             <TextInput
                 placeholder="Valor da Mão de Obra (R$)"
                 value={valorMaoDeObra}
@@ -163,6 +208,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 keyboardType="decimal-pad"
             />
 
+            {/* Data */}
             <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => setShowDatePicker(true)}
@@ -181,6 +227,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 />
             )}
 
+            {/* Km */}
             <TextInput
                 placeholder="Km Atual"
                 value={km}
@@ -190,10 +237,12 @@ export default function RegistrarManutencaoScreen({ navigation }) {
                 placeholderTextColor={Colors.placeholder}
             />
 
+            {/* Botão Salvar */}
             <TouchableOpacity style={styles.saveButton} onPress={handleSalvar}>
                 <Text style={styles.saveButtonText}>Salvar</Text>
             </TouchableOpacity>
 
+            {/* Voltar */}
             <TouchableOpacity
                 style={styles.backButton}
                 onPress={() => navigation.navigate('Home')}
@@ -201,6 +250,7 @@ export default function RegistrarManutencaoScreen({ navigation }) {
             >
                 <Text style={styles.backButtonText}>Voltar para Home</Text>
             </TouchableOpacity>
+
         </View>
     );
 }

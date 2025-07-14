@@ -3,7 +3,7 @@ import Colors from './Colors';
 
 export default StyleSheet.create({
     container: {
-        flex: 1,
+        flexGrow: 1, // ✅ Essencial para ScrollView funcionar corretamente
         backgroundColor: Colors.background,
         padding: 16,
     },
@@ -38,13 +38,12 @@ export default StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         marginBottom: 12,
-        overflow: 'hidden',         // para evitar borda cortando no Android
-        backgroundColor: Colors.background,  // fundo igual container para melhor visual
+        overflow: 'hidden',
+        backgroundColor: Colors.background,
     },
     picker: {
         height: 50,
         color: Colors.text,
-        // no iOS o picker tem estilo próprio, no Android essa cor funciona
     },
     subtitle: {
         fontSize: 16,

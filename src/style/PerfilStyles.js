@@ -1,4 +1,3 @@
-// src/style/PerfilStyles.js
 import { StyleSheet } from 'react-native';
 import Colors from './Colors';
 
@@ -17,7 +16,7 @@ export default StyleSheet.create({
         marginBottom: 12,
         borderWidth: 2,
         borderColor: Colors.primary,
-        overflow: 'hidden', // <== Essencial para Android cortar a imagem no círculo
+        overflow: 'hidden',
     },
     alterarFotoText: {
         textAlign: 'center',
@@ -46,11 +45,42 @@ export default StyleSheet.create({
         paddingHorizontal: 30,
         paddingVertical: 12,
         borderRadius: 6,
+        marginTop: 20,
     },
     buttonText: {
         color: Colors.buttonText,
         fontSize: 16,
         fontWeight: 'bold',
         textAlign: 'center',
+    },
+    resumoTitulo: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: Colors.primary,
+        marginBottom: 10,
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    resumoTexto: {
+        fontSize: 16,
+        color: Colors.text,
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+
+    // Aqui os estilos separados
+    pickerContainer: {
+        width: '100%',           // Ocupa toda largura possível
+        borderWidth: 1,
+        borderColor: Colors.inputBorder,
+        borderRadius: 6,
+        marginBottom: 12,
+        backgroundColor: '#fff',
+    },
+
+    picker: {
+        width: '100%',
+        height: 56,
+        color: Colors.textSecondary,  // Cor visível, diferente do fundo
     },
 });

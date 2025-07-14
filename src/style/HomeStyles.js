@@ -1,5 +1,5 @@
 import { StyleSheet, Dimensions } from 'react-native';
-import Colors from './Colors';  // Continua a importação de Colors
+import Colors from './Colors';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +16,12 @@ export default StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 30,
+        backgroundColor: '#f9f9fb',
+        elevation: 0, // Remove sombra Android
+        shadowColor: 'transparent', // Remove sombra iOS
+        shadowOpacity: 0,
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 0,
     },
 
     logo: {
@@ -30,14 +36,15 @@ export default StyleSheet.create({
 
     resumoContainer: {
         flexDirection: 'row',
-        flexWrap: 'wrap',            // Permite quebra de linha
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
+        paddingHorizontal: 12,
         marginBottom: 30,
     },
 
     cardResumo: {
         backgroundColor: '#fff',
-        width: (width - 80) / 3,     // Para caber 3 por linha com espaçamento
+        width: (width - 56) / 2,
         padding: 15,
         borderRadius: 12,
         shadowColor: '#000',
@@ -67,6 +74,7 @@ export default StyleSheet.create({
         fontWeight: '600',
         color: '#333',
         marginBottom: 15,
+        textAlign: 'center',
     },
 
     cardManutencao: {
@@ -74,11 +82,14 @@ export default StyleSheet.create({
         padding: 15,
         borderRadius: 12,
         marginBottom: 12,
+        marginHorizontal: 12,
         shadowColor: '#000',
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.08,
         shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 6,
+        shadowRadius: 4,
         elevation: 3,
+        borderLeftWidth: 5,
+        borderLeftColor: Colors.primary,
     },
 
     motoNome: {
@@ -97,6 +108,27 @@ export default StyleSheet.create({
         fontSize: 12,
         color: '#999',
         marginTop: 2,
+    },
+
+    alerta: {
+        color: 'red',
+        fontWeight: 'bold',
+        marginTop: 8,
+    },
+
+    cardAlertaTexto: {
+        marginTop: 6,
+        color: 'red',
+        fontWeight: 'bold',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+
+    observacoes: {
+        fontSize: 12,
+        color: '#777',
+        marginTop: 8,
+        fontStyle: 'italic',
     },
 
     buttonsContainer: {
@@ -147,7 +179,6 @@ export default StyleSheet.create({
         borderColor: Colors.primary,
     },
 
-    /** MODAL - Atualização de KM **/
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',

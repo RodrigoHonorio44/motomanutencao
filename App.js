@@ -10,15 +10,18 @@ import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 
+// Telas públicas
 import LoginScreen from './src/screens/LoginScreen';
 import CadastroScreen from './src/screens/CadastroScreen';
 import RecuperarSenhaScreen from './src/screens/RecuperarSenhaScreen';
 
+// Telas internas
 import HomeScreen from './src/screens/HomeScreen';
 import CadastroMotoScreen from './src/screens/CadastroMotoScreen';
 import RegistrarManutencaoScreen from './src/screens/RegistrarManutencaoScreen';
 import PerfilScreen from './src/screens/PerfilScreen';
 import AbastecimentoScreen from './src/screens/AbastecimentoScreen';
+import PecasManutencaoScreen from './src/screens/PecasManutencaoScreen';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -77,16 +80,13 @@ function CustomDrawerContent(props) {
       >
         <Ionicons name="log-out-outline" size={24} color="red" />
         <Text style={{ color: 'red', marginLeft: 12, fontWeight: '600' }}>
-          {usuario?.displayName
-            ? `Logout (${usuario.displayName})`
-            : 'Logout'}
+          {usuario?.displayName ? `Logout (${usuario.displayName})` : 'Logout'}
         </Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
   );
 }
 
-// Drawer com as telas internas do app, usando conteúdo customizado
 function AppDrawer() {
   return (
     <Drawer.Navigator
@@ -96,11 +96,9 @@ function AppDrawer() {
       <Drawer.Screen name="Home" component={HomeScreen} />
       <Drawer.Screen name="Cadastrar Moto" component={CadastroMotoScreen} />
       <Drawer.Screen name="Abastecimento" component={AbastecimentoScreen} />
-      <Drawer.Screen
-        name="Registrar Manutenção"
-        component={RegistrarManutencaoScreen}
-      />
+      <Drawer.Screen name="Registrar Manutenção" component={RegistrarManutencaoScreen} />
       <Drawer.Screen name="Perfil" component={PerfilScreen} />
+      <Drawer.Screen name="Peças Manutenção" component={PecasManutencaoScreen} />
     </Drawer.Navigator>
   );
 }
@@ -114,7 +112,7 @@ export default function App() {
         <Stack.Screen name="Cadastro" component={CadastroScreen} />
         <Stack.Screen name="RecuperarSenha" component={RecuperarSenhaScreen} />
 
-        {/* Drawer com telas internas */}
+        {/* App interno */}
         <Stack.Screen name="HomeDrawer" component={AppDrawer} />
       </Stack.Navigator>
     </NavigationContainer>

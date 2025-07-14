@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,19 +8,16 @@ import {
     Modal,
     TextInput,
     Alert,
+    Animated,
 } from 'react-native';
-import {
-    getAuth,
-    onAuthStateChanged,
-    signOut,
-} from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
     collection,
     getDocs,
     query,
+    where,
     orderBy,
     limit,
-    where,
     doc,
     getDoc,
     updateDoc,
@@ -32,21 +29,27 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen({ navigation }) {
     const auth = getAuth();
+
     const [usuario, setUsuario] = useState(null);
     const [motoSelecionadaId, setMotoSelecionadaId] = useState(null);
-
     const [manutencoesRecentes, setManutencoesRecentes] = useState([]);
     const [totalPendentes, setTotalPendentes] = useState(0);
     const [kmTotal, setKmTotal] = useState(0);
-
-    const [loading, setLoading] = useState(true);
+    const [consumoMedio, setConsumoMedio] = useState(null);
     const [error, setError] = useState(null);
 
     const [modalKmVisible, setModalKmVisible] = useState(false);
     const [modalMotosVisible, setModalMotosVisible] = useState(false);
     const [novoKm, setNovoKm] = useState('');
     const [motosList, setMotosList] = useState([]);
-    const [totalMotos, setTotalMotos] = useState(0);
+    const [loadingMotos, setLoadingMotos] = useState(true);
+    const [loadingDadosMoto, setLoadingDadosMoto] = useState(false);
+
+    // Para piscar o texto do alerta troca óleo
+    const piscarAnim = useRef(new Animated.Value(1)).current;
+
+    // Estado do alerta de troca óleo
+    const [kmRestanteTrocaOleo, setKmRestanteTrocaOleo] = useState('Carregando...');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, user => {
@@ -56,6 +59,7 @@ export default function HomeScreen({ navigation }) {
     }, []);
 
     const fetchMotos = async () => {
+        setLoadingMotos(true);
         try {
             const motosSnapshot = await getDocs(collection(db, 'motos'));
             const motos = [];
@@ -63,25 +67,25 @@ export default function HomeScreen({ navigation }) {
                 motos.push({ id: doc.id, ...doc.data() });
             });
             setMotosList(motos);
-            setTotalMotos(motos.length);
-
             if (!motoSelecionadaId && motos.length > 0) {
                 setMotoSelecionadaId(motos[0].id);
             }
         } catch (err) {
             console.error('Erro ao buscar motos:', err);
             setError('Erro ao carregar motos.');
+        } finally {
+            setLoadingMotos(false);
         }
     };
 
+    // Atualizado: retorna kmTotal para usar no efeito
     const fetchDadosMotoSelecionada = async (motoId) => {
-        if (!motoId) return;
-        setLoading(true);
+        if (!motoId) return 0;
+        setLoadingDadosMoto(true);
         setError(null);
-
         try {
             const motoDoc = await getDoc(doc(db, 'motos', motoId));
-            setKmTotal(motoDoc.exists() ? motoDoc.data().kmtotal || 0 : 0);
+            const km = motoDoc.exists() ? motoDoc.data().kmtotal || 0 : 0;
 
             const pendentesQuery = query(
                 collection(db, 'manutencoes'),
@@ -103,7 +107,6 @@ export default function HomeScreen({ navigation }) {
             recentesSnapshot.forEach(docSnap => {
                 const data = docSnap.data();
                 const moto = motosList.find(m => m.id === motoId) || {};
-
                 manutencoes.push({
                     id: docSnap.id,
                     tipo: data.tipo || '',
@@ -118,23 +121,127 @@ export default function HomeScreen({ navigation }) {
             });
 
             setManutencoesRecentes(manutencoes);
+            setKmTotal(km);
+
+            return km; // Retorna o km para ser usado logo após
         } catch (err) {
             console.error('Erro ao carregar dados da moto:', err);
             setError('Erro ao carregar dados. Tente novamente.');
+            return 0;
         } finally {
-            setLoading(false);
+            setLoadingDadosMoto(false);
         }
     };
 
-    useEffect(() => {
-        if (motoSelecionadaId) {
-            fetchDadosMotoSelecionada(motoSelecionadaId);
-        }
-    }, [motoSelecionadaId, motosList]);
+    const calcularConsumoMedio = async (motoId) => {
+        try {
+            const abastecimentosRef = collection(db, 'abastecimentos');
+            const q = query(
+                abastecimentosRef,
+                where('motoId', '==', motoId),
+                orderBy('data', 'desc'),
+                limit(10)
+            );
+            const snapshot = await getDocs(q);
 
+            const abastecimentos = [];
+            snapshot.forEach(doc => abastecimentos.push(doc.data()));
+
+            if (abastecimentos.length < 2) return null;
+
+            abastecimentos.reverse();
+
+            const kmInicial = abastecimentos[0].kmAtual || 0;
+            const kmFinal = abastecimentos[abastecimentos.length - 1].kmAtual || 0;
+            const kmRodados = kmFinal - kmInicial;
+            if (kmRodados <= 0) return null;
+
+            const litrosTotal = abastecimentos.slice(1).reduce((total, a) => total + (a.litros || 0), 0);
+            if (litrosTotal === 0) return null;
+
+            const consumo = kmRodados / litrosTotal;
+            return consumo.toFixed(2);
+        } catch (error) {
+            console.error('Erro ao calcular consumo médio:', error);
+            return null;
+        }
+    };
+
+    // Busca o próximo alerta de troca de óleo e calcula km restante
+    const fetchProximaTrocaOleo = async (motoId, kmAtualMoto) => {
+        try {
+            // Buscando a manutenção do tipo 'Óleo do motor' mais recente
+            const q = query(
+                collection(db, 'manutencoes'),
+                where('motoId', '==', motoId),
+                where('tipo', '==', 'Óleo do motor'),
+                orderBy('km', 'desc'),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) {
+                setKmRestanteTrocaOleo('Nenhum alerta');
+                stopPiscar();
+                return;
+            }
+            const manut = snapshot.docs[0].data();
+            const kmManut = manut.km || 0;
+
+            // Supondo troca de óleo a cada 3000 km
+            const intervaloTroca = 3000;
+
+            let kmRestante = kmManut + intervaloTroca - kmAtualMoto;
+
+            if (kmRestante <= 0) {
+                setKmRestanteTrocaOleo('TROCAR AGORA!');
+                startPiscar();
+            } else {
+                setKmRestanteTrocaOleo(`em ${kmRestante} km`);
+                stopPiscar();
+            }
+        } catch (error) {
+            console.error('Erro ao buscar troca de óleo:', error);
+            setKmRestanteTrocaOleo('Erro ao buscar alerta');
+            stopPiscar();
+        }
+    };
+
+    // Piscar animação
+    const startPiscar = () => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(piscarAnim, {
+                    toValue: 0,
+                    duration: 600,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(piscarAnim, {
+                    toValue: 1,
+                    duration: 600,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    };
+
+    const stopPiscar = () => {
+        piscarAnim.stopAnimation();
+        piscarAnim.setValue(1);
+    };
+
+    // Atualizado: uso só 1 useEffect para buscar dados e depois alerta
     useEffect(() => {
         fetchMotos();
     }, []);
+
+    useEffect(() => {
+        if (motoSelecionadaId) {
+            fetchDadosMotoSelecionada(motoSelecionadaId).then((km) => {
+                calcularConsumoMedio(motoSelecionadaId).then(setConsumoMedio);
+                fetchProximaTrocaOleo(motoSelecionadaId, km);
+            });
+        }
+    }, [motoSelecionadaId]);
 
     const handleAtualizarKm = async () => {
         try {
@@ -143,15 +250,11 @@ export default function HomeScreen({ navigation }) {
                 setError('Informe um valor de KM válido.');
                 return;
             }
-
             if (!motoSelecionadaId) {
                 setError('Nenhuma moto selecionada.');
                 return;
             }
-
-            const motoRef = doc(db, 'motos', motoSelecionadaId);
-            await updateDoc(motoRef, { kmtotal: kmNumber });
-
+            await updateDoc(doc(db, 'motos', motoSelecionadaId), { kmtotal: kmNumber });
             setKmTotal(kmNumber);
             setModalKmVisible(false);
             setNovoKm('');
@@ -166,20 +269,23 @@ export default function HomeScreen({ navigation }) {
     const formatarData = (data) => {
         if (!data) return '';
         if (typeof data === 'string') return data;
-        if (data.seconds) {
-            const dateObj = new Date(data.seconds * 1000);
-            return dateObj.toLocaleDateString('pt-BR');
-        }
-        if (data.toDate) {
-            return data.toDate().toLocaleDateString('pt-BR');
-        }
+        if (data.seconds) return new Date(data.seconds * 1000).toLocaleDateString('pt-BR');
+        if (data.toDate) return data.toDate().toLocaleDateString('pt-BR');
         return '';
     };
 
     const resumoDados = [
-        { id: '1', titulo: 'Motos Cadastradas', valor: totalMotos },
+        { id: '1', titulo: 'Motos Cadastradas', valor: motosList.length },
         { id: '2', titulo: 'Manutenções Pendentes', valor: totalPendentes },
         { id: '3', titulo: 'KM Total da Moto', valor: kmTotal },
+        { id: '4', titulo: 'Alertas de Peças', valor: '' },
+        { id: '5', titulo: 'Consumo Médio (km/l)', valor: consumoMedio ? `${consumoMedio} km/l` : 'N/A' },
+        {
+            id: '6',
+            titulo: 'Próxima Troca de Óleo',
+            valor: kmRestanteTrocaOleo,
+            piscar: kmRestanteTrocaOleo === 'TROCAR AGORA!',
+        },
     ];
 
     const handleLogout = async () => {
@@ -196,7 +302,7 @@ export default function HomeScreen({ navigation }) {
         setModalMotosVisible(false);
     };
 
-    if (loading) {
+    if (loadingMotos || loadingDadosMoto) {
         return <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />;
     }
 
@@ -207,39 +313,79 @@ export default function HomeScreen({ navigation }) {
                 keyExtractor={item => item.id}
                 ListHeaderComponent={
                     <>
-                        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                        <View style={styles.header}>
                             <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: 10 }}>
                                 <Ionicons name="menu" size={30} color={Colors.textPrimary} />
                             </TouchableOpacity>
-
                             <Text style={styles.logo}>MotoManutenção</Text>
-
                             <TouchableOpacity onPress={handleLogout} style={{ padding: 8 }}>
                                 <Ionicons name="log-out-outline" size={28} color="red" />
                             </TouchableOpacity>
                         </View>
 
-                        {error && (
-                            <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>{error}</Text>
-                        )}
+                        {error && <Text style={{ color: 'red', textAlign: 'center', marginTop: 20 }}>{error}</Text>}
 
                         <View style={styles.resumoContainer}>
-                            {resumoDados.map(item => (
-                                <TouchableOpacity
-                                    key={item.id}
-                                    style={styles.cardResumo}
-                                    onPress={() => {
-                                        if (item.id === '1') {
-                                            fetchMotos();
-                                            setModalMotosVisible(true);
-                                        }
-                                        if (item.id === '3') setModalKmVisible(true);
-                                    }}
-                                >
-                                    <Text style={styles.cardTitulo}>{item.titulo}</Text>
-                                    <Text style={styles.cardValor}>{item.valor}</Text>
-                                </TouchableOpacity>
-                            ))}
+                            {resumoDados.map(item => {
+                                const isPiscar = item.piscar;
+                                if (item.id === '6') {
+                                    return (
+                                        <TouchableOpacity
+                                            key={item.id}
+                                            style={[
+                                                styles.cardResumo,
+                                                isPiscar && {
+                                                    backgroundColor: '#ffcccc',
+                                                    borderWidth: 1,
+                                                    borderColor: 'red',
+                                                },
+                                            ]}
+                                            onPress={() => {
+                                                if (isPiscar) {
+                                                    Alert.alert('Atenção', 'É hora de trocar o óleo da moto!');
+                                                }
+                                            }}
+                                        >
+                                            <Animated.Text
+                                                style={[
+                                                    styles.cardValor,
+                                                    isPiscar && { opacity: piscarAnim },
+                                                ]}
+                                            >
+                                                {item.valor}
+                                            </Animated.Text>
+                                            <Text style={styles.cardTitulo}>{item.titulo}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                }
+
+                                return (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        style={styles.cardResumo}
+                                        onPress={() => {
+                                            if (item.id === '1') {
+                                                fetchMotos();
+                                                setModalMotosVisible(true);
+                                            }
+                                            if (item.id === '3') setModalKmVisible(true);
+                                            if (item.id === '4') {
+                                                if (!motoSelecionadaId) {
+                                                    Alert.alert('Atenção', 'Selecione uma moto primeiro.');
+                                                    return;
+                                                }
+                                                navigation.navigate('Peças Manutenção', {
+                                                    motoId: motoSelecionadaId,
+                                                    kmAtual: kmTotal,
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        <Text style={styles.cardTitulo}>{item.titulo}</Text>
+                                        <Text style={styles.cardValor}>{item.valor}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
 
                         <Text style={styles.sectionTitle}>Manutenções Recentes</Text>
@@ -247,9 +393,7 @@ export default function HomeScreen({ navigation }) {
                 }
                 renderItem={({ item }) => (
                     <View style={styles.cardManutencao}>
-                        <Text style={styles.motoNome}>
-                            Moto: {item.motoNome} - Placa: {item.motoPlaca}
-                        </Text>
+                        <Text style={styles.motoNome}>Moto: {item.motoNome} - Placa: {item.motoPlaca}</Text>
                         <Text>Tipo: {item.tipo}</Text>
                         <Text>Data: {formatarData(item.data)}</Text>
                         <Text>Produto: {item.produto}</Text>
@@ -261,46 +405,33 @@ export default function HomeScreen({ navigation }) {
                 ListFooterComponent={<View style={{ height: 30 }} />}
             />
 
-            {/* Modal para atualizar o KM */}
-            <Modal
-                visible={modalKmVisible}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setModalKmVisible(false)}
-            >
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '100%', maxWidth: 300 }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Atualizar KM Total</Text>
+            {/* Modal KM */}
+            <Modal visible={modalKmVisible} transparent animationType="slide" onRequestClose={() => setModalKmVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Atualizar KM Total</Text>
                         <TextInput
                             placeholder="Novo KM"
                             keyboardType="numeric"
                             value={novoKm}
                             onChangeText={setNovoKm}
-                            style={{ borderColor: '#ccc', borderWidth: 1, padding: 10, borderRadius: 8, marginBottom: 15 }}
+                            style={styles.modalInput}
                         />
-                        <TouchableOpacity
-                            onPress={handleAtualizarKm}
-                            style={{ backgroundColor: Colors.primary, padding: 12, borderRadius: 8, alignItems: 'center' }}
-                        >
-                            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Salvar KM</Text>
+                        <TouchableOpacity onPress={handleAtualizarKm} style={styles.modalButton}>
+                            <Text style={styles.modalButtonText}>Salvar KM</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setModalKmVisible(false)} style={{ marginTop: 10, alignItems: 'center' }}>
-                            <Text style={{ color: Colors.textPrimary }}>Cancelar</Text>
+                        <TouchableOpacity onPress={() => setModalKmVisible(false)} style={styles.modalCancel}>
+                            <Text style={styles.modalCancelText}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
 
-            {/* Modal de seleção de Moto */}
-            <Modal
-                visible={modalMotosVisible}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setModalMotosVisible(false)}
-            >
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '100%', maxWidth: 300, maxHeight: '80%' }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Selecione uma Moto</Text>
+            {/* Modal Motos */}
+            <Modal visible={modalMotosVisible} transparent animationType="slide" onRequestClose={() => setModalMotosVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
+                        <Text style={styles.modalTitle}>Selecione uma Moto</Text>
                         <FlatList
                             data={motosList}
                             keyExtractor={item => item.id}
@@ -313,8 +444,8 @@ export default function HomeScreen({ navigation }) {
                                 </TouchableOpacity>
                             )}
                         />
-                        <TouchableOpacity onPress={() => setModalMotosVisible(false)} style={{ marginTop: 10, alignItems: 'center' }}>
-                            <Text style={{ color: Colors.textPrimary }}>Fechar</Text>
+                        <TouchableOpacity onPress={() => setModalMotosVisible(false)} style={styles.modalCancel}>
+                            <Text style={styles.modalCancelText}>Fechar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
